@@ -23,13 +23,174 @@ model admin {
   is_active            Boolean @default(false)
   is_creator           Boolean @default(false)
   hashed_refresh_token String?
+
+  @@map("admin")
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  email         String   @unique
-  created_at    DateTime @default(now())
-  is_active     Boolean  @default(false)
-  hash_password String
-  hashedToken   String?
+  id             Int              @id @default(autoincrement())
+  email          String           @unique
+  age            Int
+  gender         String
+  created_at     DateTime         @default(now())
+  is_active      Boolean          @default(false)
+  hash_password  String
+  hashedToken    String?
+  Profile        Profile[]
+  BillingHistory BillingHistory[]
+
+  @@map("user")
+}
+
+enum BillingHistoryStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model BillingHistory {
+  id               Int                  @id @default(autoincrement())
+  userId           Int
+  subscriptionId   Int
+  payment_methodId Int
+  amount           Float
+  date             DateTime
+  status           BillingHistoryStatus
+
+  user          User          @relation(fields: [userId], references: [id])
+  subscription  Subscription  @relation(fields: [subscriptionId], references: [id])
+  paymentmethod PaymentMethod @relation(fields: [payment_methodId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("billing_history")
+}
+
+model Language {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Profile   Profile[]
+
+  @@map("language")
+}
+
+model Profile {
+  id              Int      @id @default(autoincrement())
+  name            String
+  userId          Int
+  avatar          String
+  languageId      Int
+  age             Int
+  is_active       Boolean  @default(true)
+  hashed_password String
+  langugage       Language @relation(fields: [languageId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  Subscription  Subscription[]
+  SerachHistory SerachHistory[]
+
+  @@map("profile")
+}
+
+model Users {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+}
+
+model Category {
+  id                Int        @id @default(autoincrement())
+  name              String
+  description       String
+  parent_categoryId Int
+  parent_category   Category   @relation("CategoryToParent", fields: [parent_categoryId], references: [id])
+  subcategories     Category[] @relation("CategoryToParent")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@map("category")
+}
+
+model Genres {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  GenreImages GenreImages[]
+
+  @@map("genres")
+}
+
+model GenreImages {
+  id        Int      @id @default(autoincrement())
+  image_url String
+  genresId  Int
+  is_main   Boolean  @default(false)
+  genre     Genres   @relation(fields: [genresId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("genres_images")
+}
+
+model PaymentMethod {
+  id             Int              @id @default(autoincrement())
+  name           String
+  BillingHistory BillingHistory[]
+
+  @@map("payment_method")
+}
+
+model SubscriptionPlans {
+  id              Int            @id @default(autoincrement())
+  name            String
+  description     String
+  monthly_price   Float
+  max_frofile     Int
+  max_screens     Int
+  download_enbled Boolean
+  ads_enabled     Boolean
+  is_active       Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  Subscription    Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                  Int               @id @default(autoincrement())
+  profileId           Int
+  profil              Profile           @relation(fields: [profileId], references: [id])
+  planId              Int
+  plan                SubscriptionPlans @relation(fields: [planId], references: [id])
+  start_date          String
+  end_date            String
+  auto_renew          Boolean
+  is_active           Boolean           @default(true)
+  last_amount_paid    Float
+  suvscription_source String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  BillingHistory      BillingHistory[]
+
+  @@map("subscription")
+}
+
+model SerachHistory {
+  id           Int    @id @default(autoincrement())
+  profileId    Int
+  search_query String
+
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("search_history")
 }

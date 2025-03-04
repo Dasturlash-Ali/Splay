@@ -9,6 +9,9 @@ import { Response } from 'express';
 import * as bcrypt from "bcrypt"
 import { AdminSignInDto, CreateAdminDto } from '../admin/dto';
 import { AdminService } from '../admin/admin.service';
+import { ResponseFields } from '../common/types/response.type';
+import { Tokens } from '../common/types/tokens.type';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
@@ -16,9 +19,10 @@ export class AuthService {
     private readonly userService: UsersService,
     private readonly jwtService: JwtService,
     private readonly adminService: AdminService,
+    private readonly prismaService: PrismaService,
   ) {}
 
-  async getTokens(user: User){
+  async getTokens(user: User): Promise<Tokens>{
     const payload = {
       id: user.id,
       email: user.email,
@@ -62,7 +66,9 @@ export class AuthService {
     return response;
   }
 
-  async signIn(signInDto: UserSignInDto, res: Response){
+  async signIn(signInDto: UserSignInDto, res: Response
+  ): Promise<ResponseFields>
+  {
     const { email, password } = signInDto;
     const user = await this.userService.findOneByEmail(email)
     if(!user){
@@ -90,34 +96,35 @@ export class AuthService {
       httpOnly: true,
     });
     const response = {
-      message: "User logged in",
-      userId: user.id,
+      id: user.id,
       access_token: tokens.access_token,
     };
     return response;
   }
 
-  async signOut(refreshToken: string, res: Response){
-    const userData = await this.jwtService.verify(refreshToken, {
-        secret: process.env.REFRESH_TOKEN_KEY,
+  async signOut(userId: number, res: Response): Promise<boolean>{
+    console.log(userId);
+    
+    const user = await this.prismaService.user.updateMany({
+      where: {
+        id: userId,
+        hashedToken: {
+          not: null,
+        }
+      },
+      data: {
+        hashedToken: null,
+      },
     });
-    if(!userData){
-        throw new ForbiddenException("User not verified");
-    }
-    const hashed_refresh_token = null;
-    await this.userService.updateRefreshToken(
-        userData.id,
-        hashed_refresh_token
-    );
 
+    if(!user) throw new ForbiddenException("Access Denied");
     res.clearCookie("refresh_token");
-    const response = {
-        message: "User logged use succesfully",
-    };
-    return response;
+    return true;
+    
   }
 
-  async refreshToken(userId: number, refreshToken: string, res: Response){
+  async refreshToken(userId: number, refreshToken: string, res: Response
+  ): Promise<ResponseFields>{
     const decodedToken = await this.jwtService.decode(refreshToken);
 
     if(userId != decodedToken["id"]){
@@ -149,8 +156,7 @@ export class AuthService {
     });
 
     const response = {
-        message: "User refreshed",
-        user: user.id,
+        id: user.id,
         access_token: tokens.access_token,
     };
 
@@ -172,7 +178,7 @@ export class AuthService {
     return response
   }
 
-  async adminSignIn(adminSignInDto: AdminSignInDto, res: Response) {
+  async adminSignIn(adminSignInDto: AdminSignInDto, res: Response): Promise<ResponseFields> {
         
     const { email, password } = adminSignInDto
 
@@ -207,43 +213,42 @@ export class AuthService {
         httpOnly: true
     })
     const response = {
-        message: "Admin logged in",
-        adminId: admin.id,
+        id: admin.id,
         access_token: tokens.access_token
     };
 
     return response
   }
 
-  async AdminSignOut(refreshToken: string, res: Response) {
-    const adminData = await this.jwtService.verify(refreshToken, {
-        secret: process.env.REFRESH_TOKEN_KEY,
+  async AdminSignOut(adminId: number, res: Response): Promise<boolean> {
+    console.log(adminId);
+
+    const admin = await this.prismaService.admin.updateMany({
+      where: {
+        id: adminId,
+        hashed_refresh_token: {
+          not: null,
+        }
+      },
+      data: {
+        hashed_refresh_token: null,
+      },
     });
-    if (!adminData) {
-        throw new ForbiddenException("Admin not verified");
-    }
-    const hashed_refresh_token = null;
-    await this.adminService.updateRefreshToken(
-        adminData.id,
-        hashed_refresh_token
-    );
 
+    if(!admin) throw new ForbiddenException("Access Denied");
     res.clearCookie("refresh_token");
+    return true
 
-    const response = {
-        message: "Admin logged out successfully",
-    };
-    return response;
   }
 
-  async AdminRefreshToken(id: number, refreshToken: string, res: Response) {
+  async AdminRefreshToken(adminId: number, refreshToken: string, res: Response) {
     const decodedToken = await this.jwtService.decode(refreshToken);
 
-    if (id != decodedToken["id"]) {
+    if (adminId != decodedToken["id"]) {
         throw new BadRequestException("Ruxsat etilmagan");
     }
 
-    const admin = await this.adminService.findOne(+id);
+    const admin = await this.adminService.findOne(adminId);
     if (!admin || !admin.hashed_refresh_token) {
         throw new BadRequestException("Admin not found");
     }
@@ -268,8 +273,7 @@ export class AuthService {
         httpOnly: true,
     });
     const response = {
-        message: "Admin refreshed",
-        adminId: admin.id,
+        id: admin.id,
         access_token: tokens.access_token,
     };
     return response;
